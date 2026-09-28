@@ -1,7 +1,14 @@
 # Support Ticket Insights Agent — Project Context
 
 ## Status
-Steps 1-7 done. **Jumped ahead to Step 13 at user's request** (clean + load data into Postgres, verify with manual SQL) before doing Steps 8-11 (system design write-up) and the rest of Step 12 (skeleton) — those are still outstanding and should be circled back to; the working agreement (one step at a time, review between steps) is paused for this detour, not abandoned. Next action after this: either go back and formalize Steps 8-11, or continue forward into Step 14 (first end-to-end text-to-SQL path) — ask the user which.
+Steps 1-7 and 13 done (13 done ahead of 8-12 at user's request). Now backfilling 8-11. Step 8 done (below). Next: Step 9 (tech choices + rejected alternatives).
+
+## High-level flow (Step 8 — done)
+Two Mermaid diagrams in `docs/architecture.md`: the offline data pipeline (built, Step 13)
+and the online query flow (router → text-to-SQL / RAG, not built yet — Steps 14-17). Also
+documents *where* each Step 3/4/11 guardrail lives in the diagram (DB-level PII exclusion,
+double-enforced SELECT-only, explicit third "I don't know" router path, sources always
+returned).
 
 ## Data pipeline (Step 13 — done, partial)
 - `scripts/clean_data.py`: raw CSV → `data/clean/tickets_clean.csv`. Implements every decision in `data-notes.md` (column rename, ENUM-matching value remap via explicit maps that fail loudly on an unmapped value, no imputation of structurally-missing fields, no synthesized ticket-opened date, `retrieval_text` built only from signal-bearing fields). Has 11 built-in self-checks against the exact numbers in `data-notes.md`; all pass.
