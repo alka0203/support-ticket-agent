@@ -1,7 +1,26 @@
 # Support Ticket Insights Agent — Project Context
 
 ## Status
-Steps 1-2 done. Next action: Phase 1, Step 3 (define done/good + success metric).
+Steps 1-4 done. Next action: Phase 2, Step 5 (explore the data in a notebook).
+
+## Done/good definition (Step 3 — done)
+**Must-haves:**
+- All 10 count/filter questions answered with exact numbers matching direct SQL.
+- Correct routing (SQL vs RAG) on all 17 eval questions.
+- Every answer shows its sources (SQL query run, or retrieved ticket excerpts).
+- Unanswerable questions return "I don't know," never a fabricated answer.
+- Read-only DB access — generated SQL can never mutate data.
+
+**Nice-to-haves:** charts for count/filter answers; auth (downgraded — portfolio, not real ops); conversation memory/follow-ups; graceful handling of compound questions like #17.
+
+**Success metric:** ≥80% of the 17 eval questions correct (exact match for count/filter, human-graded "reasonable + sourced" for thematic), measured **after** the Step 6/7 data cleaning (so question #16's timestamp gap doesn't count as an automatic fail). Response time <5s/question. Zero destructive-SQL incidents (hard requirement).
+
+## Constraints and assumptions (Step 4 — done)
+- **Data volume:** 29,807 rows / ~3.9MB. Comfortably fits full-text embedding with no sampling needed; Postgres is the right choice, not overkill in practice, though this scale alone wouldn't strictly require it.
+- **Where it runs:** local Docker Compose (Postgres+pgvector, FastAPI, Streamlit) during build; free/cheap public host for the final demo (Render/Fly.io for API, Streamlit Community Cloud for UI).
+- **Budget:** personal/free-tier only, metered LLM API key with a hard low spend cap. Use a cheap/small model for routing + SQL-gen; reserve a stronger model for RAG summarization where quality is most visible.
+- **Privacy:** dataset is the public synthetic Kaggle "Customer Support Ticket Dataset" — Name/Email/Age/Gender are Faker-generated, not real people, and the dataset is already public, so sending ticket text to an external LLM API is acceptable here. Even so, `Customer Name` and `Customer Email` are dropped from anything sent to the LLM or embedded, on principle (good habit to demonstrate, adds no analytical value).
+- **Audience assumption:** no real ops team exists to design for. Default behavior (errors, refusal wording, scope) targets a technical reviewer/interviewer, so favor transparency (show SQL, show retrieved chunks) over consumer-UX polish.
 
 ## Known data gap (found while writing Step 2, matters for Step 4/6/7)
 No ticket-opened/created timestamp exists in the raw data. Only `Date of Purchase` (product purchase, not ticket filing) and `First Response Time`/`Time to Resolution`, which are both clustered around a single generation date (2023-06-01) — i.e. fake/non-activity timestamps. "Tickets opened last week"-style questions aren't answerable as-is. Resolve during cleaning (Step 6/7): either treat `Date of Purchase` as the closest proxy for recency, or synthesize a plausible `created_at`. Decide explicitly, don't silently default.
