@@ -1,7 +1,16 @@
 # Support Ticket Insights Agent — Project Context
 
 ## Status
-Steps 1-7 done (Phase 1 and 2 complete). Next action: Phase 3, Step 8 (draw the high-level flow — largely already sketched under "Chosen architecture" below, so Step 8 is mostly confirming/formalizing it as a diagram).
+Steps 1-7 done. **Jumped ahead to Step 13 at user's request** (clean + load data into Postgres, verify with manual SQL) before doing Steps 8-11 (system design write-up) and the rest of Step 12 (skeleton) — those are still outstanding and should be circled back to; the working agreement (one step at a time, review between steps) is paused for this detour, not abandoned. Next action after this: either go back and formalize Steps 8-11, or continue forward into Step 14 (first end-to-end text-to-SQL path) — ask the user which.
+
+## Data pipeline (Step 13 — done, partial)
+- `scripts/clean_data.py`: raw CSV → `data/clean/tickets_clean.csv`. Implements every decision in `data-notes.md` (column rename, ENUM-matching value remap via explicit maps that fail loudly on an unmapped value, no imputation of structurally-missing fields, no synthesized ticket-opened date, `retrieval_text` built only from signal-bearing fields). Has 11 built-in self-checks against the exact numbers in `data-notes.md`; all pass.
+- `docker-compose.yml` + `.env.example`: Postgres 16 + pgvector, local dev only.
+- `db/roles.sql`: `sql_gen_readonly` role, `SELECT`-only on `tickets_safe`, nothing else — the DB-level enforcement of the no-PII and no-mutation guardrails decided in Step 3/4/7.
+- `scripts/load_to_postgres.py`: applies `db/schema.sql` + `db/roles.sql`, loads the cleaned CSV via `pandas.to_sql`. Idempotent (drops/recreates on each run).
+- `scripts/verify_db.py`: manual verification queries. All passed: row count and status breakdown match `data-notes.md` exactly; an invalid ENUM value errors instead of silently matching 0 rows; `tickets_safe` confirmed to exclude `customer_name`/`customer_email`; `sql_gen_readonly` confirmed able to read `tickets_safe` but blocked from the base `tickets` table and blocked from any mutation (`DELETE` on `tickets_safe` → permission denied).
+- **Not yet done:** `ticket_embeddings` table exists in the schema but is empty — populating it needs an embedding model choice, which is Step 9 (not yet formalized). Deferred to Step 16 (add RAG path) as originally planned.
+- Independent audit of this pipeline against `data-notes.md` was dispatched to a subagent (see task notification) rather than only self-checked.
 
 ## Clean data model (Step 7 — done)
 Full DDL with rationale comments: `db/schema.sql`. Summary:
