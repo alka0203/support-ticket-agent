@@ -10,6 +10,18 @@ nbformat==5.11.1
 nbclient==0.11.0
 ipykernel==7.3.0
 
+# Anthropic SDK
+anthropic
+
+# Embeddings (RAG path)
+sentence-transformers
+
+# API + UI
+fastapi
+uvicorn[standard]
+streamlit
+httpx
+
 # Postgres
 psycopg2-binary==2.9.13
 SQLAlchemy==2.1.1

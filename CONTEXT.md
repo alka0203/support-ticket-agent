@@ -1,7 +1,70 @@
 # Support Ticket Insights Agent — Project Context
 
 ## Status
-Steps 1-7 and 13 done (13 done ahead of 8-12 at user's request). Now backfilling 8-11. Step 8 done (below). Next: Step 9 (tech choices + rejected alternatives).
+Steps 1-17 done. Next: Step 18 (deploy — Render for API + Postgres, Streamlit Community Cloud for UI).
+
+## API + UI (Step 17 — done)
+- `api/main.py`: FastAPI app. `POST /ask` — calls `route()` then `ask_sql()` or `ask_rag()`, returns unified `AskResponse` (question, route, answer, sql, rows, sources, error). `GET /health`. CORS open for local Streamlit. Startup lifespan checks DB connection and raises `RuntimeError` with a clear message if Postgres is unreachable.
+- `ui/app.py`: Streamlit chat UI. `st.chat_input` + `st.session_state.messages` history. SQL branch shows answer + collapsible SQL code block + results dataframe. RAG branch shows answer + collapsible sources table with similarity scores. Unknown/error shows inline. Calls API via `httpx`; shows a clear message if the API isn't running.
+- Run: terminal 1: `uvicorn api.main:app --port 8000` / terminal 2: `streamlit run ui/app.py`
+
+## RAG path (Step 16 — done)
+- `sentence-transformers` added to `requirements.txt` and installed in `.venv`
+- `agent/db.py`: added `get_admin_conn()` for RAG's hardcoded embedding-search query (not LLM-generated SQL — admin role is appropriate here)
+- `scripts/embed_tickets.py`: one-time batch; builds `retrieval_text` = type + subject + product + description (resolution excluded), encodes with `all-MiniLM-L6-v2`, loads 8,469 rows into `ticket_embeddings`. Idempotent (TRUNCATE + reload). Run once, ~10s on CPU.
+- `agent/rag.py`: `ask_rag(question)` — lazy-loads model, embeds question, pgvector cosine search (top-15), formats excerpts, summarizes with `claude-sonnet-4-6`. Returns `{answer, sources, error}`.
+- `scripts/ask.py`: RAG branch wired in, prints answer + sources table with similarity scores.
+- `scripts/eval.py`: RAG questions updated from "skip" to smoke test (non-empty answer + sources, no error).
+
+**Post-Step-16 eval results:**
+- Routing: 16/16 (100%)
+- SQL accuracy: 11/11 (100%)
+- RAG smoke tests: 5/5 (100%) — non-empty answer, 15 sources each, no errors
+
+Note: RAG answer quality is intentionally shallow — `ticket_description` is 100% templated filler (see data-notes.md). Answers correctly lean on structured fields (type, subject, product). Documented as known limitation.
+
+## Eval results (Step 15 — done)
+`scripts/eval.py` — 17 questions, runs routing + SQL answer checks.
+
+**First-run results (text-to-SQL path only):**
+- Routing: 16/16 (100%) — Q16 correctly refused as "unknown" (no valid duration)
+- SQL accuracy: 11/11 (100%) — all scalar and structure checks pass
+- RAG: 5 questions deferred to Step 16
+- Q17 (compound): routed to "sql", no crash
+
+False-positive fixes applied to eval: column alias differences (agent uses descriptive names, ref SQL uses `count`) and float precision (`2.99` vs `2.9913...`) both count as correct. Check logic: row count only for structure, numeric rounding for scalars.
+
+## End-to-end text-to-SQL path (Step 14 — done)
+`agent/` package:
+- `agent/prompts.py`: `ROUTER_SYSTEM_PROMPT` (3-label classifier) and `SQL_GEN_SYSTEM_PROMPT` (full schema + ENUM values + data caveats baked in)
+- `agent/router.py`: `route(question)` → `"sql" | "rag" | "unknown"` — Haiku, max_tokens=10
+- `agent/sql_gen.py`: `ask_sql(question)` → Haiku SQL-gen → SELECT validation (`_is_select`) → run as `sql_gen_readonly` → return `{answer, sql, rows, error}`
+- `agent/db.py`: `get_sql_gen_conn()` — connects as `sql_gen_readonly`
+
+`scripts/ask.py`: CLI entry point. Prints router label, answer, SQL, and rows. RAG branch stubs out with "not yet implemented (Step 16)."
+
+Model IDs used: `claude-haiku-4-5-20251001` (router + SQL-gen), `claude-sonnet-4-6` reserved for RAG (Step 16).
+`ANTHROPIC_API_KEY` added to `.env.example`.
+
+## Tech choices (Step 9 — done)
+Full doc: `docs/tech-choices.md`. Summary:
+- **Router + SQL-gen:** `claude-haiku-4-5` (cheap, fast, right for classification and single-table SQL against a known schema)
+- **RAG summarization:** `claude-sonnet-4-6` (quality visible here, one call per query so cost bounded)
+- **Embeddings:** `sentence-transformers/all-MiniLM-L6-v2` (384 dims, local, no API cost, matches `VECTOR(384)` already in schema)
+- **API:** FastAPI (async, Pydantic, auto OpenAPI docs)
+- **UI:** Streamlit (free Community Cloud hosting, fast to build)
+- **Deploy:** Render (API + Postgres) + Streamlit Community Cloud (UI), both free tiers
+
+## Risks and safety (Steps 10-11 — done)
+Full doc: `docs/risks-and-safety.md`. Top risks:
+- **Routing misclassification** (highest) — tested first via routing-only eval before anything else
+- **SQL hallucination** (high) — mitigated by full schema + ENUM values in system prompt + loud Postgres errors on invalid values
+- **RAG signal quality** (medium) — accepted residual; retrieval_text built from structured fields, templating documented as known limitation
+- **Bad SQL mutation** — double-enforced: DB role has no write grants + app rejects non-SELECT before executing
+- **Unanswerable questions** — explicit third router branch ("out of scope") returns "I don't know"
+
+## Project skeleton (Step 12 — done)
+README.md created. Covers: problem, architecture, setup instructions, repo layout, current status table, known limitations.
 
 ## High-level flow (Step 8 — done)
 Two Mermaid diagrams in `docs/architecture.md`: the offline data pipeline (built, Step 13)
