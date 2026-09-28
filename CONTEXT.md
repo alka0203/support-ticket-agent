@@ -1,7 +1,7 @@
 # Support Ticket Insights Agent — Project Context
 
 ## Status
-Steps 1-19 done. Next: Step 20 (short personal retrospective).
+All 20 steps complete.
 
 ## API + UI (Step 17 — done)
 - `api/main.py`: FastAPI app. `POST /ask` — calls `route()` then `ask_sql()` or `ask_rag()`, returns unified `AskResponse` (question, route, answer, sql, rows, sources, error). `GET /health`. CORS open for local Streamlit. Startup lifespan checks DB connection and raises `RuntimeError` with a clear message if Postgres is unreachable.
