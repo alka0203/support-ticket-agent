@@ -74,7 +74,7 @@ Key data caveats (full detail in [data-notes.md](data-notes.md)):
 | 15 | Eval script, run against text-to-SQL | Done |
 | 16 | RAG path + router | Done |
 | 17 | FastAPI + Streamlit UI | Done |
-| 18 | Deploy + eval on deployed version | **Next** |
+| 18 | Deploy + eval on deployed version | Done |
 | 19 | Handoff README + architecture story | Pending |
 | 20 | Retrospective | Pending |
 
@@ -166,6 +166,37 @@ python scripts/eval.py
 ├── .env.example        # Copy to .env for local dev
 └── requirements.txt    # Python dependencies
 ```
+
+---
+
+## Deployment (Render + Streamlit Community Cloud)
+
+### API on Render
+
+1. Fork / push this repo to GitHub.
+2. In [Render](https://render.com), create a new **Blueprint** and point it at your repo — `render.yaml` defines both the web service and the Postgres database.
+3. Set these environment variables in the Render dashboard (under the web service):
+   - `ANTHROPIC_API_KEY` — your Anthropic key
+   - `SQL_GEN_DB_PASSWORD` — any strong password (e.g. `openssl rand -hex 16`)
+   - `DATABASE_URL` is injected automatically by Render from the linked database.
+4. After the first deploy, open the **Render shell** and run the one-time setup:
+   ```bash
+   python scripts/setup_deploy.py
+   ```
+   This loads the schema, creates the `sql_gen_readonly` role, loads 8,469 tickets, and generates embeddings (~2 min on Render free tier).
+5. The API is now live at `https://support-ticket-agent-api.onrender.com`.
+
+> **Free tier note:** the web service sleeps after 15 min of inactivity; first request after sleep takes ~30s. The first RAG request after a cold start also downloads the embedding model (~90MB).
+
+### UI on Streamlit Community Cloud
+
+1. Go to [share.streamlit.io](https://share.streamlit.io) and connect your GitHub repo.
+2. Set **Main file path** to `ui/app.py`.
+3. Under **Advanced settings → Secrets**, add:
+   ```toml
+   API_URL = "https://support-ticket-agent-api.onrender.com"
+   ```
+4. Deploy. The UI is public and free.
 
 ---
 

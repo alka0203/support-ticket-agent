@@ -5,19 +5,33 @@ Idempotent: drops and recreates the schema objects each run, so it's safe to
 re-run while iterating.
 """
 import os
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
 
 import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
-load_dotenv()
+sys.path.insert(0, str(Path(__file__).parent.parent))
+load_dotenv(Path(__file__).parent.parent / ".env")
 
-PG_HOST = "localhost"
-PG_PORT = os.environ["POSTGRES_PORT"]
-PG_DB = os.environ["POSTGRES_DB"]
-PG_USER = os.environ["POSTGRES_USER"]
-PG_PASSWORD = os.environ["POSTGRES_PASSWORD"]
+
+def _admin_dsn() -> dict:
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url:
+        r = urlparse(db_url)
+        return {"host": r.hostname, "port": r.port or 5432,
+                "dbname": r.path.lstrip("/"), "user": r.username, "password": r.password}
+    return {"host": "localhost", "port": os.environ["POSTGRES_PORT"],
+            "dbname": os.environ["POSTGRES_DB"], "user": os.environ["POSTGRES_USER"],
+            "password": os.environ["POSTGRES_PASSWORD"]}
+
+
+def _sqlalchemy_url(dsn: dict) -> str:
+    return (f"postgresql+psycopg2://{dsn['user']}:{dsn['password']}"
+            f"@{dsn['host']}:{dsn['port']}/{dsn['dbname']}")
 
 CLEAN_CSV = "data/clean/tickets_clean.csv"
 
@@ -71,13 +85,14 @@ def load_tickets(engine) -> int:
 
 
 def main():
-    admin_conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASSWORD)
+    dsn = _admin_dsn()
+    admin_conn = psycopg2.connect(**dsn)
     admin_conn.autocommit = True
     with admin_conn.cursor() as cur:
         apply_ddl(cur)
     admin_conn.close()
 
-    engine = create_engine(f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}")
+    engine = create_engine(_sqlalchemy_url(dsn))
     n = load_tickets(engine)
     print(f"Loaded {n} rows into tickets.")
 
