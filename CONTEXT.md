@@ -1,7 +1,7 @@
 # Support Ticket Insights Agent — Project Context
 
 ## Status
-Steps 1-4 done. Next action: Phase 2, Step 5 (explore the data in a notebook).
+Steps 1-5 done, data-notes.md written for Step 6. Next action: Phase 2, Step 7 (design the clean data model).
 
 ## Done/good definition (Step 3 — done)
 **Must-haves:**
@@ -16,16 +16,16 @@ Steps 1-4 done. Next action: Phase 2, Step 5 (explore the data in a notebook).
 **Success metric:** ≥80% of the 17 eval questions correct (exact match for count/filter, human-graded "reasonable + sourced" for thematic), measured **after** the Step 6/7 data cleaning (so question #16's timestamp gap doesn't count as an automatic fail). Response time <5s/question. Zero destructive-SQL incidents (hard requirement).
 
 ## Constraints and assumptions (Step 4 — done)
-- **Data volume:** 29,807 rows / ~3.9MB. Comfortably fits full-text embedding with no sampling needed; Postgres is the right choice, not overkill in practice, though this scale alone wouldn't strictly require it.
+- **Data volume:** 8,469 rows / ~3.9MB (corrected in Step 5). Comfortably fits full-text embedding with no sampling needed; Postgres is the right choice, not overkill in practice, though this scale alone wouldn't strictly require it.
 - **Where it runs:** local Docker Compose (Postgres+pgvector, FastAPI, Streamlit) during build; free/cheap public host for the final demo (Render/Fly.io for API, Streamlit Community Cloud for UI).
 - **Budget:** personal/free-tier only, metered LLM API key with a hard low spend cap. Use a cheap/small model for routing + SQL-gen; reserve a stronger model for RAG summarization where quality is most visible.
 - **Privacy:** dataset is the public synthetic Kaggle "Customer Support Ticket Dataset" — Name/Email/Age/Gender are Faker-generated, not real people, and the dataset is already public, so sending ticket text to an external LLM API is acceptable here. Even so, `Customer Name` and `Customer Email` are dropped from anything sent to the LLM or embedded, on principle (good habit to demonstrate, adds no analytical value).
 - **Audience assumption:** no real ops team exists to design for. Default behavior (errors, refusal wording, scope) targets a technical reviewer/interviewer, so favor transparency (show SQL, show retrieved chunks) over consumer-UX polish.
 
-## Known data gap (found while writing Step 2, matters for Step 4/6/7)
-No ticket-opened/created timestamp exists in the raw data. Only `Date of Purchase` (product purchase, not ticket filing) and `First Response Time`/`Time to Resolution`, which are both clustered around a single generation date (2023-06-01) — i.e. fake/non-activity timestamps. "Tickets opened last week"-style questions aren't answerable as-is. Resolve during cleaning (Step 6/7): either treat `Date of Purchase` as the closest proxy for recency, or synthesize a plausible `created_at`. Decide explicitly, don't silently default.
-
-Also confirmed while inspecting rows: `Resolution` text is templated/Faker-style gibberish (e.g. "Case maybe show recently my computer follow.") — same synthetic-text caveat as `Ticket Description`. Both matter for RAG quality expectations.
+## Known data issues
+Full detail and cleaning decisions live in `data-notes.md` (Step 6). Summary:
+- No ticket-opened/created timestamp exists. Only `Date of Purchase` (product purchase, not ticket filing) and `First Response Time`/`Time to Resolution`, confirmed in Step 5 to span only 3 distinct calendar dates (~2023-05-31–06-02) — fake generation timestamps, not real activity data. "Tickets opened last week"-style questions aren't answerable as literally worded.
+- `Ticket Description` contains the literal unresolved `{product_purchased}` placeholder in **100% of rows** (confirmed in Step 5, not just a spot-check), plus random unrelated Faker-generated sentences appended after the templated opener. `Resolution` text is 100% unrelated Faker gibberish with zero usable signal. Both matter for RAG design: lean on structured fields (`Ticket Type`, `Ticket Subject`, `Product Purchased`) as primary retrieval signal, treat free text as low-signal supplementary context.
 
 ## Example questions (Step 2 — done, 17 total)
 **Count/filter (SQL):**
@@ -74,10 +74,11 @@ Source: Anthropic's "Building Effective AI Agents" (architecture patterns doc).
 - Known biggest risk (per Step 10): routing misclassification and text-to-SQL accuracy. These get tested first, against the example-question eval set, before anything else is built on top.
 
 ## Data
-- Raw file: `data/raw/customer_support_tickets.csv` (29,807 rows, 17 columns)
+- Raw file: `data/raw/customer_support_tickets.csv` (**8,469 rows** — corrected in Step 5; an earlier `wc -l` count of 29,807 was wrong, it miscounted embedded newlines inside quoted multi-line `Ticket Description` fields — 17 columns)
+- Full exploration: `notebooks/01_explore.ipynb` (executed). Formal findings: `data-notes.md`.
 - Columns: Ticket ID, Customer Name, Customer Email, Customer Age, Customer Gender, Product Purchased, Date of Purchase, Ticket Type, Ticket Subject, Ticket Description, Ticket Status, Resolution, Ticket Priority, Ticket Channel, First Response Time, Time to Resolution, Customer Satisfaction Rating
-- **Known quirk (from a first glance at row 1, needs full confirmation in Step 5/6):** this matches the public Kaggle "Customer Support Ticket Dataset" — `Ticket Description` text is templated (contains a literal unresolved `{product_purchased}` placeholder in at least one row) and includes fabricated PII-shaped strings (e.g. a fake billing zip). Treat descriptions as synthetic/templated, not organic free text, when designing the RAG branch and when reporting eval results — this will affect how convincing "theme" answers can look and should be called out in Step 6's data notes and Step 19's known limitations.
-- Contains real-shaped PII columns (Customer Name, Email, Age, Gender) — flag as a constraint to confirm in Step 4 (can this go to an external LLM API as-is, or does it need scrubbing/hashing first?).
+- This is the public Kaggle "Customer Support Ticket Dataset" — see "Known data issues" below and `data-notes.md` for the full Step 5/6 findings.
+- Contains real-shaped PII columns (Customer Name, Email, Age, Gender), all Faker-generated/fake per Step 4 — dropped from anything sent to the LLM or embedded, on principle.
 
 ## The 20-step plan (from user's original message)
 **Phase 1 — Understand the problem**
