@@ -10,7 +10,7 @@ Steps 1-7 done. **Jumped ahead to Step 13 at user's request** (clean + load data
 - `scripts/load_to_postgres.py`: applies `db/schema.sql` + `db/roles.sql`, loads the cleaned CSV via `pandas.to_sql`. Idempotent (drops/recreates on each run).
 - `scripts/verify_db.py`: manual verification queries. All passed: row count and status breakdown match `data-notes.md` exactly; an invalid ENUM value errors instead of silently matching 0 rows; `tickets_safe` confirmed to exclude `customer_name`/`customer_email`; `sql_gen_readonly` confirmed able to read `tickets_safe` but blocked from the base `tickets` table and blocked from any mutation (`DELETE` on `tickets_safe` → permission denied).
 - **Not yet done:** `ticket_embeddings` table exists in the schema but is empty — populating it needs an embedding model choice, which is Step 9 (not yet formalized). Deferred to Step 16 (add RAG path) as originally planned.
-- Independent audit of this pipeline against `data-notes.md` was dispatched to a subagent (see task notification) rather than only self-checked.
+- **Independent audit (subagent) found and we fixed one real bug:** `tickets_safe` only excluded `customer_name`/`customer_email`, but `data-notes.md` says all four PII-shaped columns are excluded "regardless" — `customer_age`/`customer_gender` were being exposed to the `sql_gen_readonly` role. My own `verify_db.py` didn't catch it because it only checked name/email. Fixed in `db/schema.sql` (view now drops all four) and `scripts/verify_db.py` (now asserts all four are absent, not just two) — reloaded and reverified, all checks pass.
 
 ## Clean data model (Step 7 — done)
 Full DDL with rationale comments: `db/schema.sql`. Summary:

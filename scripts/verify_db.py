@@ -29,11 +29,15 @@ except Exception as e:
     print("OK, errored as expected:", str(e).splitlines()[0])
 conn.rollback()
 
-print("--- tickets_safe hides PII ---")
+print("--- tickets_safe hides all PII-shaped columns (data-notes.md: all four, regardless) ---")
 cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='tickets_safe' ORDER BY 1")
 cols = [r[0] for r in cur.fetchall()]
 print(cols)
-print("customer_name present?", "customer_name" in cols, " customer_email present?", "customer_email" in cols)
+pii_columns = ["customer_name", "customer_email", "customer_age", "customer_gender"]
+leaked = [c for c in pii_columns if c in cols]
+if leaked:
+    raise SystemExit(f"FAIL: PII column(s) exposed in tickets_safe: {leaked}")
+print("OK, none of", pii_columns, "present in tickets_safe")
 
 print("--- sql_gen_readonly role: can it read tickets_safe? ---")
 ro_conn = psycopg2.connect(

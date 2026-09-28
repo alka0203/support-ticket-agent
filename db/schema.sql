@@ -67,14 +67,16 @@ CREATE INDEX idx_tickets_product  ON tickets (product_purchased);
 -- database role is granted SELECT on. Combined with that role being read-only
 -- (no INSERT/UPDATE/DELETE grants, enforced at the Postgres role level in
 -- Step 13), this is the concrete implementation of two Step 3/4 guardrails at
--- once: "generated SQL can never mutate data" and "customer_name/email never
--- reach the LLM," enforced by the database itself rather than by trusting the
--- LLM's system prompt to behave.
+-- once: "generated SQL can never mutate data" and "no PII-shaped column ever
+-- reaches the LLM," enforced by the database itself rather than by trusting
+-- the LLM's system prompt to behave. Excludes all four PII-shaped columns
+-- per data-notes.md's Step 4 decision ("...excluded from anything sent to
+-- the LLM API or embedded, regardless") — not just customer_name/email, but
+-- customer_age/customer_gender too. An earlier version of this view only
+-- dropped name/email; caught by an independent audit against data-notes.md.
 CREATE VIEW tickets_safe AS
 SELECT
     ticket_id,
-    customer_age,
-    customer_gender,
     product_purchased,
     date_of_purchase,
     ticket_type,

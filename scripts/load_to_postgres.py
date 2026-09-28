@@ -22,6 +22,12 @@ PG_PASSWORD = os.environ["POSTGRES_PASSWORD"]
 CLEAN_CSV = "data/clean/tickets_clean.csv"
 
 DROP_ALL = """
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sql_gen_readonly') THEN
+        EXECUTE 'DROP OWNED BY sql_gen_readonly';
+    END IF;
+END $$;
 DROP VIEW IF EXISTS tickets_safe CASCADE;
 DROP TABLE IF EXISTS ticket_embeddings CASCADE;
 DROP TABLE IF EXISTS tickets CASCADE;
