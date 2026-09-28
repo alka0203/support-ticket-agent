@@ -1,7 +1,46 @@
 # Support Ticket Insights Agent — Project Context
 
 ## Status
-Project just initialized. **No plan steps completed yet.** Next action: Phase 1, Step 1 (problem statement).
+Steps 1-2 done. Next action: Phase 1, Step 3 (define done/good + success metric).
+
+## Known data gap (found while writing Step 2, matters for Step 4/6/7)
+No ticket-opened/created timestamp exists in the raw data. Only `Date of Purchase` (product purchase, not ticket filing) and `First Response Time`/`Time to Resolution`, which are both clustered around a single generation date (2023-06-01) — i.e. fake/non-activity timestamps. "Tickets opened last week"-style questions aren't answerable as-is. Resolve during cleaning (Step 6/7): either treat `Date of Purchase` as the closest proxy for recency, or synthesize a plausible `created_at`. Decide explicitly, don't silently default.
+
+Also confirmed while inspecting rows: `Resolution` text is templated/Faker-style gibberish (e.g. "Case maybe show recently my computer follow.") — same synthetic-text caveat as `Ticket Description`. Both matter for RAG quality expectations.
+
+## Example questions (Step 2 — done, 17 total)
+**Count/filter (SQL):**
+1. How many tickets are currently open vs closed vs pending customer response?
+2. How many critical-priority tickets are still open?
+3. Which ticket type (technical issue, billing, cancellation, refund, product inquiry) has the most tickets?
+4. How many tickets came in through each channel (social media, chat, email, phone)?
+5. What's the average customer satisfaction rating for closed tickets?
+6. How many refund requests are still pending a customer response?
+7. Which products have the most technical-issue tickets?
+8. How many tickets are tied to purchases made in 2021 vs 2020?
+9. What's the average satisfaction rating broken down by channel?
+10. How many high-priority tickets have no resolution recorded yet?
+
+**Fuzzy/thematic (RAG):**
+11. What are the most common technical issues customers report?
+12. What do people complain about most for [a specific product]?
+13. Summarize the typical reasons customers request refunds.
+14. What kinds of billing inquiries come in most often?
+15. Are there common themes in low-satisfaction (1-2 star) tickets?
+
+**Mixed / router stress-tests:**
+16. Which high-priority tickets are still open after 3 days? (needs the timestamp gap resolved)
+17. How many tickets are complaints about GoPro Hero, and what are they mostly about? (compound: count + theme, tests router on mixed-intent questions)
+
+## Project framing
+**This is a portfolio piece**, not a real ops deployment. Implications for later steps:
+- Auth is nice-to-have, not must-have (Step 3).
+- Deployment target should be something demoable/public (a hosted demo, e.g. Streamlit Community Cloud / Render / Fly.io free tier), not enterprise infra (Step 18).
+- README/handoff (Step 19) and retro (Step 20) should be written with an interview audience in mind — clear architecture story, honest about tradeoffs and limitations.
+- "Ops team" in the problem statement below is the target *persona* the tool is designed for, even though there's no real ops team using it.
+
+## Problem statement (Step 1 — done)
+Ops and support leads currently have to manually scan through thousands of tickets to spot volume trends, priority backlogs, and recurring complaint themes. This project lets them ask questions about ticket data in plain English — counts/filters answered exactly from the database, thematic questions answered from ticket text with cited sources — and get a trustworthy answer in seconds instead of hours of manual digging.
 
 ## Working agreement
 Go through the 20-step plan below **one step at a time**. After finishing a step, show the concrete output and stop — wait for explicit go-ahead before starting the next step. Do not batch multiple steps.
