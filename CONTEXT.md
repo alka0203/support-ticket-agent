@@ -1,7 +1,13 @@
 # Support Ticket Insights Agent — Project Context
 
 ## Status
-Steps 1-5 done, data-notes.md written for Step 6. Next action: Phase 2, Step 7 (design the clean data model).
+Steps 1-7 done (Phase 1 and 2 complete). Next action: Phase 3, Step 8 (draw the high-level flow — largely already sketched under "Chosen architecture" below, so Step 8 is mostly confirming/formalizing it as a diagram).
+
+## Clean data model (Step 7 — done)
+Full DDL with rationale comments: `db/schema.sql`. Summary:
+- **`tickets`** — base table, full fidelity to source (snake_case columns, 4 Postgres ENUMs for the categorical fields so an invalid value in generated SQL errors loudly instead of silently matching 0 rows). No `created_at`/ticket-opened column exists or is synthesized — `date_of_purchase` keeps its real meaning. `first_response_time`/`time_to_resolution` kept only for presence/absence checks, explicitly documented as not a valid duration pair (see data-notes.md follow-up finding: 49% negative deltas).
+- **`tickets_safe`** (view) — same as `tickets` minus `customer_name`/`customer_email`. This is what the text-to-SQL DB role actually gets `SELECT` on (role is also read-only, granted in Step 13) — makes the Step 3/4 privacy and no-mutation guardrails enforced by Postgres itself, not just prompted for.
+- **`ticket_embeddings`** — `retrieval_text` built from `ticket_type + ticket_subject + product_purchased + ticket_description` (per data-notes.md's signal/noise finding); `resolution` deliberately excluded (100% filler). pgvector HNSW index for similarity search.
 
 ## Done/good definition (Step 3 — done)
 **Must-haves:**

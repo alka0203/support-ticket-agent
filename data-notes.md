@@ -76,6 +76,16 @@ using `Date of Purchase` when a question is genuinely about purchase recency, or
 specifically. Eval question #16 will be used to verify this refusal behavior rather than a
 guess.
 
+**Follow-up finding (checked while designing the Step 7 schema):**
+`First Response Time` and `Time to Resolution` are not a valid start/end pair either. Of the
+2,769 rows where both are present, `Time to Resolution − First Response Time` is **negative
+for 1,365 rows (49%)**, ranging down to −23h13m, with a near-zero median (10 min) and a
+symmetric-looking spread (mean ≈ 0, std ≈ 9.6h) — the signature of two independently random
+timestamps, not a real elapsed duration. **Decision:** never expose or compute an
+"average time to resolution" style answer from these two columns; the clean schema keeps
+them as raw timestamps (useful only for confirming presence/absence, e.g. eval Q10), and the
+SQL-gen system prompt explicitly says duration math between them is invalid.
+
 ## Clean categorical fields
 `Ticket Type` (5 values), `Ticket Status` (3), `Ticket Priority` (4), `Ticket Channel` (4),
 `Customer Gender` (3) — no typos, no casing inconsistency, no stray categories, roughly
