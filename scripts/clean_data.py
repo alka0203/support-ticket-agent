@@ -92,6 +92,16 @@ def clean() -> pd.DataFrame:
         unmapped = df[col].isna().sum()
         assert unmapped == 0, f"{unmapped} unmapped value(s) in {col} — source has a new category"
 
+    # Replace the unresolved {product_purchased} placeholder in ticket_description
+    # with the actual product name from the row. This is the only template
+    # placeholder that has a corresponding data column — all other {…} patterns
+    # in the text are Faker-generated code-snippet noise and cannot be resolved.
+    df["ticket_description"] = df.apply(
+        lambda r: r["ticket_description"].replace("{product_purchased}", r["product_purchased"])
+        if isinstance(r["ticket_description"], str) else r["ticket_description"],
+        axis=1,
+    )
+
     df["date_of_purchase"] = pd.to_datetime(df["date_of_purchase"]).dt.date
     df["first_response_time"] = pd.to_datetime(df["first_response_time"], errors="coerce")
     df["time_to_resolution"] = pd.to_datetime(df["time_to_resolution"], errors="coerce")
@@ -141,6 +151,7 @@ def verify(df: pd.DataFrame) -> None:
     checks.append(("no customer_name/email dropped from base file", {"customer_name", "customer_email"} <= set(df.columns)))
     checks.append(("no created_at / ticket-opened column invented", "created_at" not in df.columns))
     checks.append(("resolution excluded from retrieval_text", not df["retrieval_text"].str.contains("Five tree those particular").any()))
+    checks.append(("{product_purchased} placeholder resolved", not df["ticket_description"].str.contains(r"\{product_purchased\}", regex=True).any()))
 
     failed = [name for name, ok in checks if not ok]
     for name, ok in checks:
