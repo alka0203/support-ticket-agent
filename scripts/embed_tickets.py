@@ -17,11 +17,11 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 import numpy as np
 import psycopg2.extras
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 
 from agent.db import get_admin_conn
 
-MODEL_NAME = "all-MiniLM-L6-v2"
+MODEL_NAME = "BAAI/bge-small-en-v1.5"
 BATCH_SIZE = 256
 
 
@@ -42,7 +42,7 @@ def build_retrieval_text(row: dict) -> str:
 
 def main() -> None:
     print(f"Loading model {MODEL_NAME}...")
-    model = SentenceTransformer(MODEL_NAME)
+    model = TextEmbedding(MODEL_NAME)
 
     conn = get_admin_conn()
     conn.autocommit = False
@@ -60,13 +60,7 @@ def main() -> None:
     texts = [build_retrieval_text(t) for t in tickets]
 
     print(f"Encoding with {MODEL_NAME} (batch_size={BATCH_SIZE})...")
-    embeddings = model.encode(
-        texts,
-        batch_size=BATCH_SIZE,
-        show_progress_bar=True,
-        normalize_embeddings=True,   # cosine similarity via dot product
-        convert_to_numpy=True,
-    )
+    embeddings = np.array(list(model.embed(texts, batch_size=BATCH_SIZE)))
     print(f"Encoded {len(embeddings)} embeddings, dim={embeddings.shape[1]}.")
 
     print("Loading into ticket_embeddings (truncate + reload)...")

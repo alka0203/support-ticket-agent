@@ -1,26 +1,30 @@
 """RAG branch: embed question → pgvector search → Claude Sonnet summarization.
 
-Query-time embedding uses the HuggingFace Inference API (same model as batch
-embed_tickets.py) so the web service doesn't need to load PyTorch at runtime.
-Set HF_TOKEN in env for higher rate limits (free token from huggingface.co).
+Query-time embedding uses fastembed (ONNX runtime, no PyTorch) so the web
+service fits within Render's 512 MB free tier.  The same model is used in
+scripts/embed_tickets.py for batch embedding, keeping both in the same vector
+space.  The ONNX model (~50 MB) is downloaded on first call and cached.
 """
-import os
-
 import anthropic
-import httpx
-import numpy as np
 import psycopg2.extras
+from fastembed import TextEmbedding
 
 from agent.db import get_admin_conn
 
-_HF_API_URL = (
-    "https://api-inference.huggingface.co/pipeline/feature-extraction"
-    "/sentence-transformers/all-MiniLM-L6-v2"
-)
+_EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 _TOP_K = 15
 _LLM_MODEL = "claude-sonnet-4-6"
 
+# Lazy singletons — loaded once on first call, not at import time.
+_embedder: TextEmbedding | None = None
 _client: anthropic.Anthropic | None = None
+
+
+def _get_embedder() -> TextEmbedding:
+    global _embedder
+    if _embedder is None:
+        _embedder = TextEmbedding(_EMBED_MODEL)
+    return _embedder
 
 
 def _get_client() -> anthropic.Anthropic:
@@ -31,30 +35,8 @@ def _get_client() -> anthropic.Anthropic:
 
 
 def _embed_query(text: str) -> list[float]:
-    """Embed a query string via the HuggingFace Inference API.
-
-    Uses the same model as scripts/embed_tickets.py so the query lives in the
-    same vector space as the stored embeddings.  The response shape varies by
-    model/pipeline version, so we defensively mean-pool any extra dimensions
-    then L2-normalise to match the stored normalised vectors.
-    """
-    token = os.environ.get("HF_TOKEN", "")
-    headers = {"Authorization": f"Bearer {token}"} if token else {}
-    resp = httpx.post(
-        _HF_API_URL,
-        json={"inputs": text, "options": {"wait_for_model": True}},
-        headers=headers,
-        timeout=30.0,
-    )
-    resp.raise_for_status()
-    arr = np.array(resp.json(), dtype=float)
-    # Collapse to 1-D by mean-pooling any extra dimensions (token axis, batch axis)
-    while arr.ndim > 1:
-        arr = arr.mean(axis=0)
-    norm = np.linalg.norm(arr)
-    if norm > 0:
-        arr = arr / norm
-    return arr.tolist()
+    embeddings = list(_get_embedder().embed([text]))
+    return embeddings[0].tolist()
 
 
 _RAG_SYSTEM_PROMPT = """\
@@ -99,11 +81,11 @@ def ask_rag(question: str) -> dict:
         "error":   str | None,
       }
     """
-    # Embed the question via HF Inference API
+    # Embed the question
     try:
         q_vec = _embed_query(question)
     except Exception as exc:
-        return {"answer": "Embedding error — could not reach HuggingFace API.", "sources": [], "error": str(exc)}
+        return {"answer": "Embedding error.", "sources": [], "error": str(exc)}
 
     # pgvector similarity search
     try:

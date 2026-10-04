@@ -1,8 +1,11 @@
 # Web service dependencies (Render + Streamlit Community Cloud).
-# Heavy offline deps (sentence-transformers, jupyter) are in requirements-data.txt
+# Heavy offline-only deps (jupyter stack) are in requirements-data.txt
 
 # Anthropic SDK
 anthropic
+
+# Embeddings via ONNX — no PyTorch, fits in 512 MB free tier
+fastembed
 
 # API
 fastapi
@@ -11,9 +14,6 @@ uvicorn[standard]
 # UI
 streamlit
 pandas
-
-# Embeddings — query-time via HF Inference API (no torch needed at runtime)
-numpy
 httpx
 
 # Postgres
