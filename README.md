@@ -4,6 +4,8 @@ Ask questions about customer support tickets in plain English. Count/filter ques
 
 Built as a portfolio project using the Anthropic Claude API, FastAPI, Streamlit, and Postgres with pgvector.
 
+**Live demo:** https://support-ticketing-agent.streamlit.app
+
 ---
 
 ## The problem
