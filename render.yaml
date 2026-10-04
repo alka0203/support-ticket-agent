@@ -8,6 +8,8 @@ services:
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false           # set manually in Render dashboard
+      - key: HF_TOKEN
+        sync: false           # optional but recommended; free token at huggingface.co/settings/tokens
       - key: SQL_GEN_DB_PASSWORD
         sync: false           # set manually; must match what setup_deploy.py used
       - key: DATABASE_URL
