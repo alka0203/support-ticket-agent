@@ -75,6 +75,10 @@ def apply_ddl(cur) -> None:
     print("Applying db/roles.sql...")
     with open("db/roles.sql") as f:
         role_sql = f.read().replace(":'sql_gen_password'", "%s")
+    # Replace hardcoded DB name with the actual name from the connection DSN
+    # so this works on Render where the DB may not be named "support_tickets".
+    actual_dbname = cur.connection.info.dbname
+    role_sql = role_sql.replace("support_tickets", actual_dbname)
     cur.execute(role_sql, (os.environ["SQL_GEN_DB_PASSWORD"],))
 
 
